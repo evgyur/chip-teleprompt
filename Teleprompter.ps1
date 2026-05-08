@@ -1,5 +1,5 @@
-# Chip Teleprompt for Windows v20
-# Footer moved closer to buttons and fixed clipping.
+# Chip Teleprompt for Windows v21
+# Fixed bottom slider clipping with taller bottom toolbar.
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -30,7 +30,7 @@ $form = New-Object System.Windows.Forms.Form
 $form.Text = ''
 $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::None
 $form.StartPosition = [System.Windows.Forms.FormStartPosition]::Manual
-$form.MinimumSize = New-Object System.Drawing.Size(620,290)
+$form.MinimumSize = New-Object System.Drawing.Size(620,320)
 $form.BackColor = [System.Drawing.Color]::FromArgb(5,6,10)
 $form.TopMost = $true
 $form.KeyPreview = $true
@@ -41,7 +41,7 @@ $table.BackColor = [System.Drawing.Color]::FromArgb(5,6,10)
 $table.ColumnCount = 1
 $table.RowCount = 2
 [void]$table.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
-[void]$table.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 112)))
+[void]$table.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 132)))
 $form.Controls.Add($table)
 
 $stage = New-Object System.Windows.Forms.Panel
@@ -62,7 +62,7 @@ $stage.Controls.Add($scrollLabel)
 $toolbar = New-Object System.Windows.Forms.Panel
 $toolbar.Dock = [System.Windows.Forms.DockStyle]::Fill
 $toolbar.BackColor = [System.Drawing.Color]::FromArgb(18,20,27)
-$toolbar.Padding = New-Object System.Windows.Forms.Padding(10,6,10,4)
+$toolbar.Padding = New-Object System.Windows.Forms.Padding(10,5,10,8)
 $table.Controls.Add($toolbar, 0, 1)
 
 $accent = New-Object System.Windows.Forms.Panel
@@ -77,9 +77,9 @@ $toolbarGrid.ColumnCount = 1
 $toolbarGrid.RowCount = 3
 $toolbarGrid.BackColor = [System.Drawing.Color]::Transparent
 $toolbarGrid.Padding = New-Object System.Windows.Forms.Padding(0,2,0,0)
-[void]$toolbarGrid.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 38)))
-[void]$toolbarGrid.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 18)))
-[void]$toolbarGrid.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 42)))
+[void]$toolbarGrid.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 36)))
+[void]$toolbarGrid.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 20)))
+[void]$toolbarGrid.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 54)))
 $toolbar.Controls.Add($toolbarGrid)
 $toolbarGrid.BringToFront()
 
@@ -177,10 +177,10 @@ $btnExit  = New-TpButton 'Exit' 52 ([System.Drawing.Color]::FromArgb(90,36,36))
 
 $lblFontSize = New-UiLabel 'Font' 34
 $fontSize = New-Object System.Windows.Forms.TrackBar
-$fontSize.Width = 150; $fontSize.Height = 36
+$fontSize.Width = 150; $fontSize.Height = 44
 $fontSize.Minimum = 14; $fontSize.Maximum = 96; $fontSize.Value = 38; $fontSize.TickFrequency = 10
 $fontSize.BackColor = [System.Drawing.Color]::FromArgb(18,20,27)
-$fontSize.Margin = New-Object System.Windows.Forms.Padding(0,0,4,0)
+$fontSize.Margin = New-Object System.Windows.Forms.Padding(0,0,4,4)
 [void]$rowSliders.Controls.Add($fontSize)
 $lblFontValue = New-UiLabel "$($fontSize.Value) pt" 48
 
@@ -192,10 +192,10 @@ function Get-SpeedPx {
 
 $lblSpeed = New-UiLabel 'Speed' 44
 $speed = New-Object System.Windows.Forms.TrackBar
-$speed.Width = 170; $speed.Height = 36
+$speed.Width = 170; $speed.Height = 44
 $speed.Minimum = 0; $speed.Maximum = 100; $speed.Value = 28; $speed.TickFrequency = 5
 $speed.BackColor = [System.Drawing.Color]::FromArgb(18,20,27)
-$speed.Margin = New-Object System.Windows.Forms.Padding(0,0,4,0)
+$speed.Margin = New-Object System.Windows.Forms.Padding(0,0,4,4)
 [void]$rowSliders.Controls.Add($speed)
 $lblValue = New-UiLabel "$((Get-SpeedPx)) px/s" 80
 
@@ -261,14 +261,14 @@ function Snap-Top {
   $wa = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
   $targetWidth = [int]($wa.Width * 0.5)
   $form.Width = [Math]::Max($targetWidth, $form.MinimumSize.Width)
-  if ($form.Height -lt 310) { $form.Height = 394 }
+  if ($form.Height -lt 340) { $form.Height = 430 }
   $targetLeft = [int]($wa.Left + (($wa.Width - $form.Width) / 2))
   $form.TopMost = $true; $form.Location = New-Object System.Drawing.Point($targetLeft, $wa.Top); Layout-Text; $form.Activate()
 }
 function Toggle-Clean {
   $script:cleanMode = -not $script:cleanMode
   if ($script:cleanMode) { $toolbar.Visible=$false; $table.RowStyles[1].Height=0; $stage.Padding=New-Object System.Windows.Forms.Padding(16,6,16,10) }
-  else { $table.RowStyles[1].Height=112; $toolbar.Visible=$true; $stage.Padding=New-Object System.Windows.Forms.Padding(16,8,16,12) }
+  else { $table.RowStyles[1].Height=132; $toolbar.Visible=$true; $stage.Padding=New-Object System.Windows.Forms.Padding(16,8,16,12) }
   Layout-Text
 }
 function Start-WindowDrag { [NativeWin]::ReleaseCapture() | Out-Null; [NativeWin]::SendMessage($form.Handle, $WM_NCLBUTTONDOWN, [IntPtr]$HTCAPTION, [IntPtr]::Zero) | Out-Null }

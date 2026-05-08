@@ -32,4 +32,5 @@ Permissive attribution license. You may use, copy, modify and redistribute the c
 
 ## Latest changes
 
+- v21: fixed bottom slider clipping by increasing bottom toolbar height.
 - v20: fixed clipped footer and moved credits closer to buttons.
