@@ -29,3 +29,7 @@ No install required.
 ## License
 
 Permissive attribution license. You may use, copy, modify and redistribute the code, including commercially, but attribution to Evgeny “Chip” / @chipcr and the GitHub link must remain visible in redistributed copies and derivative works. See [LICENSE](LICENSE).
+
+## Latest changes
+
+- v20: fixed clipped footer and moved credits closer to buttons.

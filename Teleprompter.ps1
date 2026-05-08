@@ -1,5 +1,5 @@
-# Chip Teleprompt for Windows v19
-# Footer credits/links, manual mouse drag scroll, non-linear speed slider.
+# Chip Teleprompt for Windows v20
+# Footer moved closer to buttons and fixed clipping.
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -41,7 +41,7 @@ $table.BackColor = [System.Drawing.Color]::FromArgb(5,6,10)
 $table.ColumnCount = 1
 $table.RowCount = 2
 [void]$table.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
-[void]$table.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 128)))
+[void]$table.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 112)))
 $form.Controls.Add($table)
 
 $stage = New-Object System.Windows.Forms.Panel
@@ -62,7 +62,7 @@ $stage.Controls.Add($scrollLabel)
 $toolbar = New-Object System.Windows.Forms.Panel
 $toolbar.Dock = [System.Windows.Forms.DockStyle]::Fill
 $toolbar.BackColor = [System.Drawing.Color]::FromArgb(18,20,27)
-$toolbar.Padding = New-Object System.Windows.Forms.Padding(10,8,10,8)
+$toolbar.Padding = New-Object System.Windows.Forms.Padding(10,6,10,4)
 $table.Controls.Add($toolbar, 0, 1)
 
 $accent = New-Object System.Windows.Forms.Panel
@@ -76,10 +76,10 @@ $toolbarGrid.Dock = [System.Windows.Forms.DockStyle]::Fill
 $toolbarGrid.ColumnCount = 1
 $toolbarGrid.RowCount = 3
 $toolbarGrid.BackColor = [System.Drawing.Color]::Transparent
-$toolbarGrid.Padding = New-Object System.Windows.Forms.Padding(0,4,0,0)
+$toolbarGrid.Padding = New-Object System.Windows.Forms.Padding(0,2,0,0)
+[void]$toolbarGrid.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 38)))
+[void]$toolbarGrid.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 18)))
 [void]$toolbarGrid.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 42)))
-[void]$toolbarGrid.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 42)))
-[void]$toolbarGrid.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 22)))
 $toolbar.Controls.Add($toolbarGrid)
 $toolbarGrid.BringToFront()
 
@@ -97,13 +97,15 @@ $rowSliders.FlowDirection = [System.Windows.Forms.FlowDirection]::LeftToRight
 $rowSliders.WrapContents = $false
 $rowSliders.AutoScroll = $false
 $rowSliders.BackColor = [System.Drawing.Color]::Transparent
+$toolbarGrid.Controls.Add($rowSliders,0,2)
+
 $footer = New-Object System.Windows.Forms.FlowLayoutPanel
 $footer.Dock = [System.Windows.Forms.DockStyle]::Fill
 $footer.FlowDirection = [System.Windows.Forms.FlowDirection]::LeftToRight
 $footer.WrapContents = $false
 $footer.AutoScroll = $false
 $footer.BackColor = [System.Drawing.Color]::Transparent
-$toolbarGrid.Controls.Add($footer,0,2)
+$toolbarGrid.Controls.Add($footer,0,1)
 
 function New-FooterLabel([string]$text) {
   $l = New-Object System.Windows.Forms.Label
@@ -111,7 +113,7 @@ function New-FooterLabel([string]$text) {
   $l.AutoSize = $true
   $l.ForeColor = [System.Drawing.Color]::FromArgb(145,155,170)
   $l.Font = New-Object System.Drawing.Font('Segoe UI', 8)
-  $l.Margin = New-Object System.Windows.Forms.Padding(0,2,8,0)
+  $l.Margin = New-Object System.Windows.Forms.Padding(0,0,8,0)
   [void]$footer.Controls.Add($l)
   return $l
 }
@@ -123,7 +125,7 @@ function New-FooterLink([string]$text, [string]$url) {
   $l.ActiveLinkColor = [System.Drawing.Color]::White
   $l.VisitedLinkColor = [System.Drawing.Color]::FromArgb(105,190,255)
   $l.Font = New-Object System.Drawing.Font('Segoe UI', 8)
-  $l.Margin = New-Object System.Windows.Forms.Padding(0,2,8,0)
+  $l.Margin = New-Object System.Windows.Forms.Padding(0,0,8,0)
   $l.Add_Click({ Start-Process $url }.GetNewClosure())
   [void]$footer.Controls.Add($l)
   return $l
@@ -139,8 +141,8 @@ function New-TpButton([string]$caption, [int]$w, [System.Drawing.Color]$bg) {
   $b = New-Object System.Windows.Forms.Button
   $b.Text = $caption
   $b.Width = $w
-  $b.Height = 34
-  $b.Margin = New-Object System.Windows.Forms.Padding(0,2,7,0)
+  $b.Height = 32
+  $b.Margin = New-Object System.Windows.Forms.Padding(0,1,7,0)
   $b.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
   $b.FlatAppearance.BorderColor = [System.Drawing.Color]::FromArgb(70,80,95)
   $b.FlatAppearance.MouseOverBackColor = [System.Drawing.Color]::FromArgb(55,70,90)
@@ -259,14 +261,14 @@ function Snap-Top {
   $wa = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
   $targetWidth = [int]($wa.Width * 0.5)
   $form.Width = [Math]::Max($targetWidth, $form.MinimumSize.Width)
-  if ($form.Height -lt 310) { $form.Height = 410 }
+  if ($form.Height -lt 310) { $form.Height = 394 }
   $targetLeft = [int]($wa.Left + (($wa.Width - $form.Width) / 2))
   $form.TopMost = $true; $form.Location = New-Object System.Drawing.Point($targetLeft, $wa.Top); Layout-Text; $form.Activate()
 }
 function Toggle-Clean {
   $script:cleanMode = -not $script:cleanMode
   if ($script:cleanMode) { $toolbar.Visible=$false; $table.RowStyles[1].Height=0; $stage.Padding=New-Object System.Windows.Forms.Padding(16,6,16,10) }
-  else { $table.RowStyles[1].Height=128; $toolbar.Visible=$true; $stage.Padding=New-Object System.Windows.Forms.Padding(16,8,16,12) }
+  else { $table.RowStyles[1].Height=112; $toolbar.Visible=$true; $stage.Padding=New-Object System.Windows.Forms.Padding(16,8,16,12) }
   Layout-Text
 }
 function Start-WindowDrag { [NativeWin]::ReleaseCapture() | Out-Null; [NativeWin]::SendMessage($form.Handle, $WM_NCLBUTTONDOWN, [IntPtr]$HTCAPTION, [IntPtr]::Zero) | Out-Null }
