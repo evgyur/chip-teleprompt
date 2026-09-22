@@ -1,6 +1,6 @@
 [package]
 name = "chip-teleprompt"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 description = "Portable native Windows teleprompter"
 authors = ["Evgeny Chip (@chipcr)"]
@@ -9,6 +9,8 @@ build = "build.rs"
 
 [dependencies]
 windows-sys = { version = "=0.61.2", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Graphics_Dwm", "Win32_System_LibraryLoader", "Win32_System_DataExchange", "Win32_System_Memory", "Win32_UI_WindowsAndMessaging", "Win32_UI_Shell", "Win32_UI_HiDpi", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Controls_Dialogs"] }
+windows = { version = "=0.62.2", features = ["Win32_Foundation", "Win32_Graphics_Direct2D", "Win32_Graphics_Direct2D_Common", "Win32_Graphics_DirectWrite", "Win32_Graphics_Dxgi", "Win32_Graphics_Dxgi_Common", "Win32_Graphics_Gdi"] }
+windows-numerics = "=0.3.1"
 
 [build-dependencies]
 embed-resource = "=3.0.11"

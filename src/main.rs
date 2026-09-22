@@ -1,6 +1,9 @@
 #![cfg_attr(not(test), windows_subsystem = "windows")]
 
+mod frame_clock;
+mod frame_probe;
 mod model;
+mod text_renderer;
 mod tray;
 
 use model::{Playback, DEFAULT_TEXT};
@@ -83,6 +86,8 @@ enum Drag {
 #[derive(Clone, Copy)]
 enum Action {
     None,
+    PaintFrame,
+    ShowAndToggle,
     FontDialog,
     Snap,
     Hide,
@@ -115,6 +120,11 @@ struct App {
     tray: Option<tray::Tray>,
     taskbar_created: u32,
     status: String,
+    probe: Option<frame_probe::FrameProbe>,
+    renderer: Option<text_renderer::TextRenderer>,
+    frame_clock: Option<frame_clock::FrameClock>,
+    frame_needs_ack: bool,
+    last_render_fractional: bool,
 }
 
 impl Drop for App {
@@ -169,6 +179,11 @@ impl App {
             tray: None,
             taskbar_created: RegisterWindowMessageW(wide("TaskbarCreated").as_ptr()),
             status: String::new(),
+            probe: None,
+            renderer: text_renderer::TextRenderer::new().ok(),
+            frame_clock: frame_clock::FrameClock::new(hwnd).ok(),
+            frame_needs_ack: false,
+            last_render_fractional: false,
         }
     }
     fn top(&self) -> f64 {
@@ -332,6 +347,26 @@ impl App {
     unsafe fn reflow(&mut self, clamp: bool) {
         let (w, h) = self.logical_size();
         let stage = self.stage(w, h);
+        if let Some(renderer) = self.renderer.as_mut() {
+            if let Ok(height) = renderer.update_layout(
+                &self.text_wide[..self.text_wide.len() - 1],
+                &self.font,
+                self.font_size,
+                (stage.right - stage.left - 32).max(1) as f32,
+                self.color,
+            ) {
+                self.text_height = height;
+                if clamp {
+                    self.playback.clamp(
+                        (stage.bottom - stage.top) as f64,
+                        height,
+                        self.top(),
+                        self.bottom(),
+                    );
+                }
+                return;
+            }
+        }
         let dc = GetDC(self.hwnd);
         if dc.is_null() {
             return;
@@ -388,7 +423,9 @@ impl App {
         self.refresh();
     }
     unsafe fn sync_timer(&self) {
-        if self.playback.running {
+        if let Some(clock) = &self.frame_clock {
+            clock.set_running(self.playback.running);
+        } else if self.playback.running {
             SetTimer(self.hwnd, TIMER_ID, 16, None);
         } else {
             KillTimer(self.hwnd, TIMER_ID);
@@ -409,7 +446,12 @@ impl App {
             },
             NO_BLANKS => self.set_text(model::remove_blank_lines(&self.text)),
             FONT => return Action::FontDialog,
-            PLAY | tray::TOGGLE => self.toggle(),
+            PLAY | tray::TOGGLE => {
+                if id == tray::TOGGLE && IsWindowVisible(self.hwnd) == 0 {
+                    return Action::ShowAndToggle;
+                }
+                self.toggle();
+            }
             TOP => {
                 self.playback.reset(self.top());
                 self.refresh();
@@ -442,31 +484,47 @@ impl App {
             self.refresh();
         }
     }
-    unsafe fn render(&self, dc: HDC, width: i32, height: i32, dpi: u32) {
+    unsafe fn render(&mut self, dc: HDC, width: i32, height: i32, dpi: u32) {
         let saved = SaveDC(dc);
         self.mapped_dc(dc, dpi);
         fill(dc, rect(0, 0, width, height), rgb(5, 6, 10));
         let stage = self.stage(width, height);
         fill(dc, stage, rgb(0, 0, 0));
-        let clip_saved = SaveDC(dc);
-        IntersectClipRect(dc, stage.left, stage.top, stage.right, stage.bottom);
-        SelectObject(dc, self.text_font);
-        SetTextColor(dc, self.color);
-        let y = stage.top + self.playback.y.round() as i32;
-        let mut text_rect = rect(
-            stage.left + 16,
-            y,
-            (stage.right - stage.left - 32).max(1),
-            self.text_height.ceil() as i32 + 50,
-        );
-        DrawTextW(
-            dc,
-            self.text_wide.as_ptr(),
-            (self.text_wide.len() - 1) as i32,
-            &mut text_rect,
-            DT_WORDBREAK | DT_NOPREFIX | DT_EDITCONTROL,
-        );
-        RestoreDC(dc, clip_saved);
+        let scale = |coordinate: i32| (coordinate as f64 * dpi as f64 / 96.0).round() as i32;
+        let physical_stage = RECT {
+            left: scale(stage.left),
+            top: scale(stage.top),
+            right: scale(stage.right),
+            bottom: scale(stage.bottom),
+        };
+        self.last_render_fractional = self.renderer.as_mut().is_some_and(|renderer| {
+            renderer
+                .draw(dc, physical_stage, dpi, self.playback.y)
+                .is_ok()
+        });
+        if !self.last_render_fractional {
+            // Preserve readable text if DirectWrite cannot use a legacy font or
+            // Windows temporarily loses its rendering target.
+            let clip_saved = SaveDC(dc);
+            IntersectClipRect(dc, stage.left, stage.top, stage.right, stage.bottom);
+            SelectObject(dc, self.text_font);
+            SetTextColor(dc, self.color);
+            let y = stage.top + self.playback.y.round() as i32;
+            let mut text_rect = rect(
+                stage.left + 16,
+                y,
+                (stage.right - stage.left - 32).max(1),
+                self.text_height.ceil() as i32 + 50,
+            );
+            DrawTextW(
+                dc,
+                self.text_wide.as_ptr(),
+                (self.text_wide.len() - 1) as i32,
+                &mut text_rect,
+                DT_WORDBREAK | DT_NOPREFIX | DT_EDITCONTROL,
+            );
+            RestoreDC(dc, clip_saved);
+        }
         if !self.clean {
             fill(dc, rect(6, height - 132, width - 12, 126), TOOLBAR);
             fill(dc, rect(13, height - 127, width - 26, 2), ACCENT);
@@ -600,7 +658,7 @@ impl App {
         }
         RestoreDC(dc, saved);
     }
-    unsafe fn paint(&self) {
+    unsafe fn paint(&mut self) {
         let mut ps: PAINTSTRUCT = zeroed();
         let dc = BeginPaint(self.hwnd, &mut ps);
         if dc.is_null() {
@@ -624,6 +682,26 @@ impl App {
             DeleteDC(buffer);
         }
         EndPaint(self.hwnd, &ps);
+        if let Some(probe) = self.probe.as_mut() {
+            let y = if self.last_render_fractional {
+                self.playback.y
+            } else {
+                self.playback.y.round()
+            };
+            let rendered_y = y * self.dpi as f64 / 96.0;
+            if probe.sample(self.playback.y, rendered_y).unwrap_or(true) {
+                PostMessageW(self.hwnd, WM_CLOSE, 0, 0);
+            }
+        }
+        self.acknowledge_frame();
+    }
+    fn acknowledge_frame(&mut self) {
+        if self.frame_needs_ack {
+            self.frame_needs_ack = false;
+            if let Some(clock) = &self.frame_clock {
+                clock.acknowledge();
+            }
+        }
     }
 }
 
@@ -699,6 +777,17 @@ unsafe fn execute(hwnd: HWND, action: Action) {
     // Actions which enter Windows modal/nested message loops run after releasing RefCell.
     match action {
         Action::None => (),
+        Action::ShowAndToggle => {
+            ShowWindow(hwnd, SW_SHOWNORMAL);
+            SetForegroundWindow(hwnd);
+            with_app(|a| a.toggle());
+        }
+        Action::PaintFrame => {
+            // A synchronous paint prevents low-priority WM_PAINT starvation.
+            // This runs outside the App RefCell borrow to permit the callback.
+            UpdateWindow(hwnd);
+            with_app(|a| a.acknowledge_frame());
+        }
         Action::Quit => {
             DestroyWindow(hwnd);
         }
@@ -902,6 +991,33 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wp: usize, lp: isize) ->
         }
         match msg {
             WM_PAINT => a.paint(),
+            frame_clock::FRAME_MESSAGE => {
+                a.frame_needs_ack = true;
+                if !a.playback.running || IsWindowVisible(hwnd) == 0 {
+                    if a.playback.running {
+                        a.playback.running = false;
+                        a.sync_timer();
+                    }
+                    a.acknowledge_frame();
+                    return Action::None;
+                }
+                let now = Instant::now();
+                let dt = now.duration_since(a.last_tick).as_secs_f64();
+                a.last_tick = now;
+                if a.playback.tick(dt, model::speed_px(a.speed), a.text_height) {
+                    a.refresh();
+                }
+                if !a.playback.running {
+                    a.sync_timer();
+                }
+                return Action::PaintFrame;
+            }
+            WM_DISPLAYCHANGE => {
+                if let Some(clock) = &a.frame_clock {
+                    clock.invalidate_output();
+                }
+                a.refresh();
+            }
             WM_ERASEBKGND => (),
             WM_SIZE => {
                 if wp == SIZE_MINIMIZED as usize {
@@ -918,7 +1034,9 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wp: usize, lp: isize) ->
                 if a.playback.tick(dt, model::speed_px(a.speed), a.text_height) {
                     a.refresh();
                 }
-                a.sync_timer();
+                if !a.playback.running {
+                    a.sync_timer();
+                }
             }
             WM_KEYDOWN => {
                 if wp == VK_RETURN as usize && lp & (1 << 30) != 0 {
@@ -1047,10 +1165,14 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wp: usize, lp: isize) ->
     DefWindowProcW(hwnd, msg, wp, lp)
 }
 
-unsafe fn run(smoke_dir: Option<&std::path::Path>) -> Result<(), String> {
+unsafe fn run(
+    smoke_dir: Option<&std::path::Path>,
+    measure_dir: Option<&std::path::Path>,
+    measure_speed: u32,
+) -> Result<(), String> {
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     let class = wide(CLASS);
-    if smoke_dir.is_none() {
+    if smoke_dir.is_none() && measure_dir.is_none() {
         let existing = FindWindowW(class.as_ptr(), null());
         if !existing.is_null() {
             execute(existing, Action::Show);
@@ -1113,6 +1235,12 @@ unsafe fn run(smoke_dir: Option<&std::path::Path>) -> Result<(), String> {
     let mut app = App::new(hwnd);
     app.tray = Some(tray::Tray::new(hwnd)?);
     app.reflow(true);
+    if let Some(directory) = measure_dir {
+        app.set_text(DEFAULT_TEXT.repeat(16));
+        app.speed = measure_speed.min(100);
+        app.probe = Some(frame_probe::FrameProbe::new(directory).map_err(|e| e.to_string())?);
+        app.toggle();
+    }
     APP.with(|slot| {
         *slot.borrow_mut() = Some(app);
     });
@@ -1146,9 +1274,19 @@ fn main() {
     } else {
         None
     };
-    let result = unsafe { run(dir) };
+    let measure_dir = if args.get(1).is_some_and(|s| s == "--measure-scroll") {
+        args.get(2).map(std::path::Path::new)
+    } else {
+        None
+    };
+    let measure_speed = args
+        .get(3)
+        .and_then(|s| s.to_str())
+        .and_then(|s| s.parse::<u32>().ok())
+        .unwrap_or(28);
+    let result = unsafe { run(dir, measure_dir, measure_speed) };
     if let Err(error) = result {
-        if let Some(dir) = dir {
+        if let Some(dir) = dir.or(measure_dir) {
             let _ = std::fs::write(dir.join("FAILED.txt"), &error);
         } else {
             unsafe {
@@ -1170,7 +1308,8 @@ unsafe fn smoke_test(hwnd: HWND, dir: &std::path::Path) -> Result<(), String> {
     let mut checks = Vec::new();
     macro_rules! check {
         ($condition:expr,$label:expr) => {
-            if !$condition {
+            let passed = $condition;
+            if !passed {
                 return Err(format!("FAIL: {}", $label));
             }
             checks.push($label);
@@ -1211,6 +1350,28 @@ unsafe fn smoke_test(hwnd: HWND, dir: &std::path::Path) -> Result<(), String> {
         a.render_snapshot(dir.join("preview-150.bmp"), 144)
     })
     .ok_or("app unavailable")??;
+    check!(
+        with_app(|a| a.last_render_fractional && a.frame_clock.is_some()).unwrap_or(false),
+        "DirectWrite renderer and display frame clock active"
+    );
+    for phase in 0..4 {
+        with_app(|a| {
+            a.playback.y = 8.0 - phase as f64 * 0.25;
+            a.render_snapshot(dir.join(format!("fractional-{phase}.bmp")), 96)
+        })
+        .ok_or("app unavailable")??;
+    }
+    with_app(|a| a.playback.reset(a.top()));
+    for phase in 1..4 {
+        let previous = std::fs::read(dir.join(format!("fractional-{}.bmp", phase - 1)))
+            .map_err(|e| e.to_string())?;
+        let current = std::fs::read(dir.join(format!("fractional-{phase}.bmp")))
+            .map_err(|e| e.to_string())?;
+        check!(
+            previous != current,
+            "quarter-pixel scroll changes rendered text every frame"
+        );
+    }
     SendMessageW(hwnd, WM_KEYDOWN, VK_SPACE as usize, 0);
     check!(
         with_app(|a| a.playback.running).unwrap_or(false),
@@ -1327,8 +1488,42 @@ unsafe fn smoke_test(hwnd: HWND, dir: &std::path::Path) -> Result<(), String> {
     );
     SendMessageW(hwnd, WM_EXECUTE, tray::SHOW as usize, 0);
     check!(IsWindowVisible(hwnd) != 0, "tray Show restores window");
+    let before = with_app(|a| a.playback.y).ok_or("app unavailable")?;
+    SendMessageW(hwnd, WM_EXECUTE, PLAY as usize, 0);
+    pump_messages(std::time::Duration::from_millis(220));
+    let moving = with_app(|a| a.playback.y).ok_or("app unavailable")?;
+    check!(
+        moving < before,
+        "display frame messages advance live playback"
+    );
+    SendMessageW(hwnd, WM_EXECUTE, PLAY as usize, 0);
+    pump_messages(std::time::Duration::from_millis(120));
+    check!(
+        with_app(|a| a.playback.y == moving).unwrap_or(false),
+        "pause drains pending frame without moving text"
+    );
+    SendMessageW(hwnd, WM_EXECUTE, PLAY as usize, 0);
+    pump_messages(std::time::Duration::from_millis(220));
+    let resumed = with_app(|a| a.playback.y).ok_or("app unavailable")?;
+    check!(
+        resumed < moving && moving - resumed < 8.0,
+        "resume restarts clock without catch-up jump"
+    );
     SendMessageW(hwnd, WM_EXECUTE, tray::HIDE as usize, 0);
     check!(IsWindowVisible(hwnd) == 0, "tray Hide hides window");
+    SendMessageW(hwnd, WM_EXECUTE, tray::TOGGLE as usize, 0);
+    check!(
+        IsWindowVisible(hwnd) != 0 && with_app(|a| a.playback.running).unwrap_or(false),
+        "tray Continue restores hidden window before resuming"
+    );
+    pump_messages(std::time::Duration::from_millis(100));
+    SendMessageW(hwnd, WM_EXECUTE, tray::HIDE as usize, 0);
+    let hidden_position = with_app(|a| a.playback.y).ok_or("app unavailable")?;
+    pump_messages(std::time::Duration::from_millis(120));
+    check!(
+        with_app(|a| !a.playback.running && a.playback.y == hidden_position).unwrap_or(false),
+        "hidden window remains paused with no catch-up time"
+    );
     SendMessageW(
         hwnd,
         tray::CALLBACK,
@@ -1374,8 +1569,20 @@ unsafe fn smoke_test(hwnd: HWND, dir: &std::path::Path) -> Result<(), String> {
     Ok(())
 }
 
+unsafe fn pump_messages(duration: std::time::Duration) {
+    let start = Instant::now();
+    while start.elapsed() < duration {
+        let mut message: MSG = zeroed();
+        while PeekMessageW(&mut message, null_mut(), 0, 0, PM_REMOVE) != 0 {
+            TranslateMessage(&message);
+            DispatchMessageW(&message);
+        }
+        MsgWaitForMultipleObjectsEx(0, null(), 5, QS_ALLINPUT, MWMO_INPUTAVAILABLE);
+    }
+}
+
 impl App {
-    unsafe fn render_snapshot(&self, path: std::path::PathBuf, dpi: u32) -> Result<(), String> {
+    unsafe fn render_snapshot(&mut self, path: std::path::PathBuf, dpi: u32) -> Result<(), String> {
         let width = (700 * dpi / 96) as i32;
         let height = (320 * dpi / 96) as i32;
         let screen = GetDC(self.hwnd);

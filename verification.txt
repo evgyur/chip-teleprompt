@@ -1,12 +1,25 @@
-Chip Teleprompt 0.2.1 - white system border fix
-WM_NCPAINT/WM_NCACTIVATE suppressed for custom borderless frame; DWM non-client rendering disabled; frame metrics refreshed.
-Native WS_THICKFRAME style and resize hit-tests retained.
-cargo fmt; cargo clippy --offline --all-targets -- -D warnings; cargo build --release --offline --locked: passed.
-Chip Teleprompt 0.2.1 native Windows smoke: 24 checks passed
+Chip Teleprompt 0.2.2 - smooth scrolling
+DirectWrite/Direct2D renders fractional text coordinates without integer snapping.
+DXGI monitor vblank drives coalesced frame requests; inactive playback sleeps.
+Preserved native borderless window, controls, Ubuntu font and tray behavior.
+cargo fmt --check; cargo clippy --offline --all-targets -- -D warnings; cargo test --offline --locked (7 tests); cargo build --release --offline --locked: passed.
+Quarter-pixel regression: baseline rendered identical frames; fixed renderer produces different frames at 0.25 px steps.
+Timing on this Windows desktop, 3 seconds at 17 px/s:
+Baseline: 40.55 submitted frames/s, p50 28.369 ms, p95 34.663 ms, 51 position changes.
+Fixed: 154.64 submitted frames/s, p50 6.272 ms, p95 8.278 ms, 457 position changes.
+These are application frame-submission measurements, not guaranteed displayed FPS.
+Executable SHA256: D1FA263323FCFB7F5A7F28AA2A4BB1AAF90720828131C940B13DD508AE017108
+Installed executable hash matches C:\PORTABLE\Chip-Teleprompt\Chip-Teleprompt.exe.
+Normal installed launch and borderless appearance inspected at Windows 150% scale.
+Chip Teleprompt 0.2.2 native Windows smoke: 33 checks passed
 defaults: 700x320, 15 pt, 17 px/s
 tray icon registered with Windows Shell
 installed Ubuntu font selected by GDI
 toolbar fits minimum window width
+DirectWrite renderer and display frame clock active
+quarter-pixel scroll changes rendered text every frame
+quarter-pixel scroll changes rendered text every frame
+quarter-pixel scroll changes rendered text every frame
 Space starts playback
 Unicode text replacement retains playback and resets position
 No blanks preserves Cyrillic, indentation, playback
@@ -22,12 +35,20 @@ manual drag pauses playback
 font size preserves style and color
 Sticky top resets width and preserves resized height
 tray Show restores window
+display frame messages advance live playback
+pause drains pending frame without moving text
+resume restarts clock without catch-up jump
 tray Hide hides window
+tray Continue restores hidden window before resuming
+hidden window remains paused with no catch-up time
 tray left-click callback restores window
 tray Continue resumes playback
 tray Pause stops playback
 TaskbarCreated recreates missing tray icon
 
-Actual desktop capture visually inspected: white frame absent at Windows150% scale.
-Executable SHA256: 5C5E5A3917CC20FDB1CAE2174E9B57FA7D8AD8B6DFED25A753BA07ECCC6BD03A
-Installed hash matches: C:\PORTABLE\Chip-Teleprompt\Chip-Teleprompt.exe
+PASS: normal launch 1050x480 physical pixels, DPI=144
+PASS: normal launch tray registration
+PASS: embedded Windows icon resource
+PASS: real system font dialog opens through app command
+PASS: cancel font dialog and normal exit, code0
+PASS: tray icon removed on exit

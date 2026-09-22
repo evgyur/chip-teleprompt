@@ -47,6 +47,7 @@ try {
  $dpi=[TelepromptProbe]::GetDpiForWindow($script:appWindow)
  if ($rect.Right -ne (700*$dpi/96) -or $rect.Bottom -ne (320*$dpi/96)) {throw "Unexpected client size: $($rect.Right)x$($rect.Bottom) dpi=$dpi"}
  $results.Add("PASS: normal launch $($rect.Right)x$($rect.Bottom) physical pixels, DPI=$dpi")
+ for ($attempt=0;$attempt -lt 40 -and -not [TelepromptProbe]::HasIcon($script:appWindow);$attempt++) {Start-Sleep -Milliseconds 50}
  if (-not [TelepromptProbe]::HasIcon($script:appWindow)) {throw 'Tray icon missing after normal launch'}
  $results.Add('PASS: normal launch tray registration')
  if ([TelepromptProbe]::ExtractIconEx($Exe,-1,[IntPtr]::Zero,[IntPtr]::Zero,0) -lt 1) {throw 'Embedded icon resource missing'}

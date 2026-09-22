@@ -1,4 +1,4 @@
-# Capability inventory — v21 → Rust 0.2.0
+# Capability inventory — v21 → Rust
 
 Baseline: installed `C:\PORTABLE\Chip-Teleprompt\Teleprompter.ps1`, v21 plus user defaults 700×320 / 15 pt. Immutable copy: `baseline/Teleprompter.ps1`.
 
@@ -30,3 +30,9 @@ Intentional additions: mouse-wheel manual scrolling; tray hide pauses; single-in
 Verification limitation: direct Win32 handler tests cover UI behavior, but cannot substitute for human assessment of perceived scrolling smoothness on every monitor. Snapshot100%/150% checks are rendered samples; other monitor arrangements are untested.
 
 Build hashes, fresh test results, package identity, and installation readback are recorded in the delivered `verification.txt`.
+
+## 0.2.2 scrolling refinement
+
+W1/W3 keep the0.2.1 native-frame suppression. T3/P1 now use DirectWrite layout metrics and Direct2D grayscale NATURAL_SYMMETRIC antialiasing with NO_SNAP: fractional scroll offsets are preserved. Font family/style/color/underline/strikeout remain mapped from the same LOGFONT. Unsupported-font or target errors fall back to readable GDI output.
+
+A coalesced DXGI-monitor frame notification replaces repeatedly rearmed WM_TIMER rendering; acknowledgement follows actual painting. Paused playback sleeps. New native checks verify quarter-pixel images differ (the old renderer failed), live display messages advance playback, pause drains pending work without moving, and resume does not replay paused time. Timing probes record only times/positions on built-in text.
