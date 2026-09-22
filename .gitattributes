@@ -1,0 +1,2 @@
+# Preserve the exact installed baseline bytes documented in PARITY.md.
+baseline/Teleprompter.ps1 -text

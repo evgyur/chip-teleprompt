@@ -1,0 +1,33 @@
+Chip Teleprompt 0.2.1 - white system border fix
+WM_NCPAINT/WM_NCACTIVATE suppressed for custom borderless frame; DWM non-client rendering disabled; frame metrics refreshed.
+Native WS_THICKFRAME style and resize hit-tests retained.
+cargo fmt; cargo clippy --offline --all-targets -- -D warnings; cargo build --release --offline --locked: passed.
+Chip Teleprompt 0.2.1 native Windows smoke: 24 checks passed
+defaults: 700x320, 15 pt, 17 px/s
+tray icon registered with Windows Shell
+installed Ubuntu font selected by GDI
+toolbar fits minimum window width
+Space starts playback
+Unicode text replacement retains playback and resets position
+No blanks preserves Cyrillic, indentation, playback
+Top retains playback
+F11 enters clean mode
+Escape exits clean mode
+Tab reaches font slider
+arrow key adjusts font slider
+End sets speed maximum
+Home sets speed minimum
+visible corner grip resizes window
+manual drag pauses playback
+font size preserves style and color
+Sticky top resets width and preserves resized height
+tray Show restores window
+tray Hide hides window
+tray left-click callback restores window
+tray Continue resumes playback
+tray Pause stops playback
+TaskbarCreated recreates missing tray icon
+
+Actual desktop capture visually inspected: white frame absent at Windows150% scale.
+Executable SHA256: 5C5E5A3917CC20FDB1CAE2174E9B57FA7D8AD8B6DFED25A753BA07ECCC6BD03A
+Installed hash matches: C:\PORTABLE\Chip-Teleprompt\Chip-Teleprompt.exe

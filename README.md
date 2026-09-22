@@ -1,36 +1,56 @@
-# Chip Teleprompt
+# Chip Teleprompt — Rust edition
 
-A small Windows desktop teleprompter for quick scripts, talks, videos and calls.
+Нативный переносимый телепромптер для Windows 10/11 x64. Автор: **Evgeny «Chip» / [@chipcr](https://t.me/chipcr)**. Проект: <https://github.com/evgyur/chip-teleprompt>, канал: <https://t.me/human20>.
 
-Author: [@chipcr](https://t.me/chipcr)  
-Channel: [@human20](https://t.me/human20)  
-Updates: <https://github.com/evgyur/chip-teleprompt>
+Запустите `Chip-Teleprompt.exe`. Установка Rust, PowerShell и отдельного Visual C++ Runtime не требуется. Размер по умолчанию — **700 × 320 логических пикселей**, шрифт **Ubuntu 15 pt**, скорость **17 px/s**. При масштабировании Windows 150% окно занимает 1050 × 480 физических пикселей. Если Ubuntu отсутствует, Windows подбирает замену.
 
-## Features
+## Управление
 
-- Paste text from clipboard.
-- Smooth pixel-by-pixel autoscroll.
-- Manual mouse drag scroll: grab text / black area and move it.
-- Speed slider with fine control in the slow range.
-- Font size slider.
-- Remove blank lines button.
-- Sticky top: centered at the top of the screen.
-- Borderless window with resize edges and bottom-right grip.
-- Bottom controls so the top edge stays clean.
+| Действие | Кнопка / клавиши |
+| --- | --- |
+| Вставить текст | Paste / Ctrl+V |
+| Запустить / приостановить | Start/Pause / Пробел |
+| Вернуться к началу | Top |
+| Удалить пустые строки | No blanks |
+| Гарнитура, начертание, размер, цвет | Font |
+| Закрепить сверху по центру | Sticky top / Ctrl+T |
+| Убрать панель | Clean / F11 |
+| Вернуть панель | F11 / Escape |
+| Скрыть в трей | Tray; воспроизведение приостанавливается |
+| Вернуть окно из трея | Левый щелчок по значку |
+| Меню трея | Правый щелчок: показать/скрыть, пауза/продолжить, выход |
+| Выход | Exit / Alt+F4 / «Выход» в трее |
+| Прокрутить вручную | Перетаскивание текста или колесо мыши |
+| Переместить окно | Перетащить свободное место панели |
+| Изменить размер окна | Края или правый нижний угол |
+| Управление без мыши | Tab / Shift+Tab; Enter на кнопках и ссылках; стрелки, Home/End на ползунках |
 
-## Run
+Минимальный размер — 620 × 320. Окно всегда поверх остальных. Sticky top возвращает ширину 700 и сохраняет текущую высоту. Повторный запуск показывает существующий экземпляр. Настройки и вставленный текст остаются в памяти текущего запуска; новые запуски используют указанные значения по умолчанию.
 
-1. Download the latest release zip.
-2. Extract it.
-3. Run `run-teleprompter.bat`.
+## Сборка и проверки
 
-No install required.
+Нужны Rust 1.98.0 MSVC и Visual Studio Build Tools с Windows SDK. Зависимости зафиксированы в `Cargo.lock`. Для переносимости C runtime линкуется статически.
 
-## License
+```powershell
+cargo fmt --check
+cargo clippy --locked --all-targets -- -D warnings
+cargo test --locked
+cargo build --release --locked
+Start-Process .\target\release\chip-teleprompt.exe -ArgumentList '--smoke-test C:\temp\teleprompt-check' -Wait
+```
 
-Permissive attribution license. You may use, copy, modify and redistribute the code, including commercially, but attribution to Evgeny “Chip” / @chipcr and the GitHub link must remain visible in redistributed copies and derivative works. See [LICENSE](LICENSE).
+`--smoke-test` проверяет настоящий Win32 message loop/обработчики, регистрацию в трее, размер и управление, создаёт отчёт и снимки 100%/150%. Содержимое пользовательского буфера обмена не меняет. Для проверки исходного Ubuntu он должен быть установлен.
 
-## Latest changes
+`src/model.rs` — логика прокрутки и очистки текста; `src/main.rs` — Win32/GDI окно и ввод; `src/tray.rs` — Windows Shell tray; `assets/app.ico` — многоразмерная иконка, встроенная в EXE. Программа использует только системные Windows DLL. Пользовательские сценарии не отправляются по сети; внешние ссылки открываются только по нажатию.
 
-- v21: fixed bottom slider clipping by increasing bottom toolbar height.
-- v20: fixed clipped footer and moved credits closer to buttons.
+Исходная PowerShell-реализация с пользовательскими настройками сохранена в `baseline/Teleprompter.ps1`. Установленная старая версия остаётся доступна через прежний `run-teleprompter.bat`.
+
+## Иконка
+
+Создана встроенным imagegen. Инструмент не предоставляет выбор или подтверждение конкретной модели; генерация именно через `gpt-image-2.5` не подтверждена.
+
+Промпт: «Premium Windows teleprompter app icon, dark graphite rounded tile, bold white reading lines and luminous cyan-blue play cue, recognizable at small sizes, transparent outer corners, no text».
+
+## Лицензия
+
+Сохранена Chip Teleprompt Attribution License v1.0 из исходного проекта; см. `LICENSE`. Требование указания автора и ссылки распространяется на производные версии.

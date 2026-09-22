@@ -1,2 +1,6 @@
 *.zip
 .DS_Store
+
+/target/
+*.pdb
+/verification-*/
