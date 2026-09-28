@@ -434,7 +434,7 @@ impl App {
     unsafe fn command(&mut self, id: u16) -> Action {
         match id {
             PASTE => match clipboard_text(self.hwnd) {
-                Ok(Some(text)) => self.set_text(text),
+                Ok(Some(text)) => self.set_text(model::paste_text(&text)),
                 Ok(None) => {
                     self.status = "Clipboard has no text".into();
                     self.refresh();

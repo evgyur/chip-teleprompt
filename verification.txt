@@ -1,17 +1,13 @@
-Chip Teleprompt 0.2.2 - smooth scrolling
-DirectWrite/Direct2D renders fractional text coordinates without integer snapping.
-DXGI monitor vblank drives coalesced frame requests; inactive playback sleeps.
-Preserved native borderless window, controls, Ubuntu font and tray behavior.
-cargo fmt --check; cargo clippy --offline --all-targets -- -D warnings; cargo test --offline --locked (7 tests); cargo build --release --offline --locked: passed.
-Quarter-pixel regression: baseline rendered identical frames; fixed renderer produces different frames at 0.25 px steps.
-Timing on this Windows desktop, 3 seconds at 17 px/s:
-Baseline: 40.55 submitted frames/s, p50 28.369 ms, p95 34.663 ms, 51 position changes.
-Fixed: 154.64 submitted frames/s, p50 6.272 ms, p95 8.278 ms, 457 position changes.
-These are application frame-submission measurements, not guaranteed displayed FPS.
-Executable SHA256: D1FA263323FCFB7F5A7F28AA2A4BB1AAF90720828131C940B13DD508AE017108
-Installed executable hash matches C:\PORTABLE\Chip-Teleprompt\Chip-Teleprompt.exe.
-Normal installed launch and borderless appearance inspected at Windows 150% scale.
-Chip Teleprompt 0.2.2 native Windows smoke: 33 checks passed
+Chip Teleprompt 0.2.3 - Paste link cleanup
+Paste and Ctrl+V preserve link labels and remove parenthesized HTTP(S)/mailto targets.
+Standalone URLs and ordinary parentheses are preserved.
+cargo fmt --check: passed
+cargo clippy --locked --all-targets -- -D warnings: passed
+cargo test --locked: 9 passed
+cargo build --release --locked: passed
+Executable SHA256: 184a908fed235e6cbce74017016158bde4b7ab2c10488c37ecf186c5c875e5cd
+
+Chip Teleprompt 0.2.3 native Windows smoke: 33 checks passed
 defaults: 700x320, 15 pt, 17 px/s
 tray icon registered with Windows Shell
 installed Ubuntu font selected by GDI
@@ -45,10 +41,3 @@ tray left-click callback restores window
 tray Continue resumes playback
 tray Pause stops playback
 TaskbarCreated recreates missing tray icon
-
-PASS: normal launch 1050x480 physical pixels, DPI=144
-PASS: normal launch tray registration
-PASS: embedded Windows icon resource
-PASS: real system font dialog opens through app command
-PASS: cancel font dialog and normal exit, code0
-PASS: tray icon removed on exit

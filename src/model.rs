@@ -2,6 +2,65 @@
 
 pub const DEFAULT_TEXT: &str = "Paste text with Paste button or Ctrl+V.\r\n\r\nChip Teleprompt. Smooth pixel scroll. Drag text with mouse for manual scroll. Speed slider has fine control on the left.";
 
+/// Keep link labels for reading aloud, without clipboard-exported URL targets.
+pub fn paste_text(text: &str) -> String {
+    let mut result = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(start) = rest.find('(') {
+        result.push_str(&rest[..start]);
+        rest = &rest[start..];
+        let target = rest[1..].trim_start().trim_start_matches('<');
+        let is_url = ["https://", "http://", "mailto:"].iter().any(|prefix| {
+            target
+                .get(..prefix.len())
+                .is_some_and(|s| s.eq_ignore_ascii_case(prefix))
+        });
+        let mut depth = 0;
+        let end = if is_url {
+            rest.char_indices().find_map(|(index, ch)| {
+                match ch {
+                    '(' => depth += 1,
+                    ')' => depth -= 1,
+                    _ => (),
+                }
+                (depth == 0).then_some(index)
+            })
+        } else {
+            None
+        };
+        if let Some(end) = end {
+            // Markdown [label](url), including nested brackets in the label.
+            if result.ends_with(']') {
+                let mut brackets = 0;
+                let opening = result.char_indices().rev().find_map(|(index, ch)| {
+                    match ch {
+                        ']' => brackets += 1,
+                        '[' => brackets -= 1,
+                        _ => (),
+                    }
+                    (brackets == 0).then_some(index)
+                });
+                if let Some(opening) = opening {
+                    result.pop();
+                    result.remove(opening);
+                    if opening > 0 && result.as_bytes()[opening - 1] == b'!' {
+                        result.remove(opening - 1);
+                    }
+                }
+            } else {
+                // Plain-text exports commonly use "label (https://...)".
+                result.truncate(result.trim_end_matches([' ', '\t']).len());
+            }
+            rest = &rest[end + 1..];
+        } else {
+            result.push('(');
+            rest = &rest[1..];
+        }
+    }
+    result.push_str(rest);
+    result
+}
+
 /// Fine control at low speeds, with the same midpoint rounding as .NET.
 pub fn speed_px(value: u32) -> f64 {
     let fraction = value.min(100) as f64 / 100.0;
@@ -75,6 +134,37 @@ impl Playback {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn paste_keeps_labels_without_link_targets() {
+        assert_eq!(
+            paste_text("[Google](https://google.com) и [пример](https://example.com/a_(b))!"),
+            "Google и пример!"
+        );
+        assert_eq!(paste_text("Google (https://blog.google/innovation-and-ai/models-and-research/gemini-models/gemini-3-8-text-to-speech/)."), "Google.");
+        assert_eq!(paste_text("[Документ](<https://example.com> \"Title\")\r\n![Фото](https://example.com/photo.png)"), "Документ\r\nФото");
+        assert_eq!(
+            paste_text("[имя [уточнение]](https://example.com)"),
+            "имя [уточнение]"
+        );
+        assert_eq!(
+            paste_text("Почта [автора](mailto:author@example.com)"),
+            "Почта автора"
+        );
+    }
+
+    #[test]
+    fn paste_preserves_regular_text_and_incomplete_links() {
+        for text in [
+            "",
+            "Текст (пояснение).\r\n\r\nСледующая строка",
+            "https://example.com",
+            "[название](https://example.com",
+            "[1] и (обычный текст)",
+        ] {
+            assert_eq!(paste_text(text), text);
+        }
+    }
 
     #[test]
     fn speed_endpoints_default_and_monotonicity() {
